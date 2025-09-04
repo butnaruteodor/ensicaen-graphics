@@ -6,7 +6,11 @@
 NORI_NAMESPACE_BEGIN
 class Box : public Shape {
 public:
-  Box(const PropertyList &props) {}
+  Box(const PropertyList &props) {
+    // Axis-aligned unit cube by default [-1,1] in each axis
+    m_min = Point3f(-1.f, -1.f, -1.f);
+    m_max = Point3f( 1.f,  1.f,  1.f);
+  }
 
   void activate() {
     if (!m_bsdf) {
@@ -17,37 +21,46 @@ public:
   }
 
   bool rayIntersect(Ray3f &ray, Intersection &its,
-                    bool shadowRay = false) const {
+                  bool shadowRay = false) const {
     float tmin = ray.mint;
     float tmax = ray.maxt;
 
-    // For each axis
+    // For each axis, intersect with the slab
     for (int i = 0; i < 3; i++) {
-        float invD = 1.0f / ray.d[i];   // inverse of direction component
+        float invD = 1.0f / ray.d[i];
         float t0 = (m_min[i] - ray.o[i]) * invD;
         float t1 = (m_max[i] - ray.o[i]) * invD;
 
-        if (invD < 0.0f) std::swap(t0, t1);
+        if (invD < 0.f)
+            std::swap(t0, t1);
 
         tmin = std::max(tmin, t0);
         tmax = std::min(tmax, t1);
 
-        if (tmax <= tmin) // interval collapsed → no intersection
-            return false;
+        if (tmax <= tmin)
+            return false; // missed the box
     }
 
+    // We hit the box at entry point tmin
+    float t = tmin;
+    if (t < ray.mint || t > ray.maxt)
+        return false;
 
-    if (tmin <= tmax && tmin >= ray.mint && tmin <= ray.maxt) {
-        Normal3f n(0,0,0);
-        // determine which face was hit
-        for (int i = 0; i < 3; i++) {
-            if (std::abs(its.p[i] - m_min[i]) < 1e-4f) n[i] = -1;
-            else if (std::abs(its.p[i] - m_max[i]) < 1e-4f) n[i] = 1;
-        }
-        updateRayAndHit(ray, its, tmin, n);
+    if (shadowRay)
         return true;
+
+    // Compute normal of the hit face
+    Point3f p = ray(t);
+    Normal3f n(0.f, 0.f, 0.f);
+    const float eps = 1e-4f;
+    for (int i = 0; i < 3; i++) {
+        if (std::abs(p[i] - m_min[i]) < eps) n[i] = -1;
+        else if (std::abs(p[i] - m_max[i]) < eps) n[i] = 1;
     }
-  }
+
+    updateRayAndHit(ray, its, t, n);
+    return true;
+}
 
   /// Register a child object (e.g. a BSDF) with the mesh
   void addChild(NoriObject *obj) {
@@ -95,6 +108,7 @@ private:
   }
 
 private:
+  Point3f m_min, m_max; 
   BSDF *m_bsdf = nullptr;       ///< BSDF of the surface
   Emitter *m_emitter = nullptr; ///< Associated emitter, if any
 };
