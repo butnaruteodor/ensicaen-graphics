@@ -18,37 +18,35 @@ public:
 
   bool rayIntersect(Ray3f &ray, Intersection &its,
                     bool shadowRay = false) const {
-    // Parameters
-    Normal3f n(0, 1, 0); // Color
-    float 
+    float tmin = ray.mint;
+    float tmax = ray.maxt;
 
-    // Solution calculation
-    float denominator = 2 * ray.d.dot(ray.d);
-    float a = ray.d.dot(ray.d);
-    float b = 2*ray.o.dot(ray.d);
-    float c = ray.o.dot(ray.o) - radius*radius;
-    float delt2 = b*b - 4*a*c;
-    // Check if we have solution
-    if(delt2 < 0)
-    {
-        return false;
+    // For each axis
+    for (int i = 0; i < 3; i++) {
+        float invD = 1.0f / ray.d[i];   // inverse of direction component
+        float t0 = (m_min[i] - ray.o[i]) * invD;
+        float t1 = (m_max[i] - ray.o[i]) * invD;
+
+        if (invD < 0.0f) std::swap(t0, t1);
+
+        tmin = std::max(tmin, t0);
+        tmax = std::min(tmax, t1);
+
+        if (tmax <= tmin) // interval collapsed → no intersection
+            return false;
     }
-    // Take the closest solution to the origin
-    float t1 = -b+std::sqrt(delt2);
-    float t2 = -b-std::sqrt(delt2);
 
-    float numerator = (t1<t2) ? t1:t2;
-    if (denominator == 0.)
-      return false;
-    float t = numerator / denominator;
-    if (t >= ray.mint and t <= ray.maxt) {
-      if (shadowRay) {
+
+    if (tmin <= tmax && tmin >= ray.mint && tmin <= ray.maxt) {
+        Normal3f n(0,0,0);
+        // determine which face was hit
+        for (int i = 0; i < 3; i++) {
+            if (std::abs(its.p[i] - m_min[i]) < 1e-4f) n[i] = -1;
+            else if (std::abs(its.p[i] - m_max[i]) < 1e-4f) n[i] = 1;
+        }
+        updateRayAndHit(ray, its, tmin, n);
         return true;
-      }
-      updateRayAndHit(ray, its, t, n);
-      return true;
     }
-    return false;
   }
 
   /// Register a child object (e.g. a BSDF) with the mesh
