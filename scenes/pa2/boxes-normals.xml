@@ -1,0 +1,111 @@
+<scene>
+  <!-- Independent sample generator, user-selected samples per pixel -->
+  <sampler type="independent">
+    <integer name="sampleCount" value="1"/>
+  </sampler>
+
+  <!-- Use the direct illumination integrator -->
+  <integrator type="normals"/>
+
+  <!-- Render the scene as viewed by a perspective camera -->
+  <camera type="perspective">
+    <transform name="toWorld">
+      <lookat target="0 , 0 , 0" origin="1, 0, -10" up="0, 1, 0"/>
+    </transform>
+
+    <!-- Field of view: 30 degrees -->
+    <float name="fov" value="30"/>
+
+    <!-- 768 x 768 pixels -->
+    <integer name="width" value="768"/>
+    <integer name="height" value="768"/>
+  </camera>
+
+  <!-- back plane -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <rotate axis="1,0,0" angle="-90"/>
+      <translate value="0,0,3"/>
+    </transform>
+    <shape type="plane">
+    </shape>
+  </shape>
+
+  <!-- top plane -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <rotate axis="1,0,0" angle="180"/>
+      <translate value="0,2,0"/>
+    </transform>
+    <shape type="plane">
+    </shape>
+  </shape>
+
+  <!-- bottom plane -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <translate value="0,-2,0"/>
+    </transform>
+    <shape type="plane">
+    </shape>
+  </shape>
+
+  <!-- left plane -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <rotate axis="0,0,1" angle="-90"/>
+      <translate value="-2,0,0"/>
+    </transform>
+    <shape type="plane">
+    </shape>
+  </shape>
+
+  <!-- right plane -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <rotate axis="0,0,1" angle="90"/>
+      <translate value="2,0,0"/>
+    </transform>
+    <shape type="plane">
+    </shape>
+  </shape>
+
+  <!-- First box -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <translate value="-2,1.5,2"/>
+    </transform>
+    <shape type="box">
+    </shape>
+  </shape>
+
+  <!-- second box -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <rotate axis="0,0,1" angle="0"/>
+      <translate value="2,1.5,2"/>
+    </transform>
+    <shape type="box">
+    </shape>
+  </shape>
+
+  <!-- First box -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <translate value="2,-1.5,2"/>
+    </transform>
+    <shape type="box">
+    </shape>
+  </shape>
+
+  <!-- second box -->
+  <shape type="instance">
+    <transform name="toWorld">
+      <rotate axis="0,0,1" angle="0"/>
+      <translate value="-2,-1.5,2"/>
+    </transform>
+    <shape type="box">
+    </shape>
+  </shape>
+
+</scene>
