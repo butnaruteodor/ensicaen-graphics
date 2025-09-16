@@ -1,15 +1,19 @@
 #include <nori/bsdf.h>
 #include <nori/emitter.h>
 #include <nori/shape.h>
+#include <nori/transform.h>
 #include <iostream>
 
 NORI_NAMESPACE_BEGIN
 class Instance : public Shape {
 public:
-  Instance(const PropertyList &props) {}
+  Instance(const PropertyList &props) {
+    // Get transform
+    // Get shape
+  }
 
   void activate() {
-    if (!m_bsdf) {
+    if (!m_shape) {
       /* If no material was assigned, instantiate a diffuse BRDF */
       m_bsdf = static_cast<BSDF *>(
           NoriObjectFactory::createInstance("diffuse", PropertyList()));
@@ -18,56 +22,19 @@ public:
 
   bool rayIntersect(Ray3f &ray, Intersection &its,
                     bool shadowRay = false) const {
-    // Parameters
-    Normal3f n(0, 1, 0); // Color
-    float radius = 2;    // Sphere radius
+    // Inverse ray and call rayIntersect of child objects
 
-    // Solution calculation
-    float denominator = 2 * ray.d.dot(ray.d);
-    float a = ray.d.dot(ray.d);
-    float b = 2*ray.o.dot(ray.d);
-    float c = ray.o.dot(ray.o) - radius*radius;
-    float delt2 = b*b - 4*a*c;
-    // Check if we have solution
-    if(delt2 < 0)
-    {
-        return false;
-    }
-    // Take the closest solution to the origin
-    float t1 = -b+std::sqrt(delt2);
-    float t2 = -b-std::sqrt(delt2);
-
-    float numerator = (t1<t2) ? t1:t2;
-    if (denominator == 0.)
-      return false;
-    float t = numerator / denominator;
-    if (t >= ray.mint and t <= ray.maxt) {
-      if (shadowRay) {
-        return true;
-      }
-      updateRayAndHit(ray, its, t, n);
-      return true;
-    }
-    return false;
   }
 
   /// Register a child object (e.g. a BSDF) with the mesh
   void addChild(NoriObject *obj) {
     switch (obj->getClassType()) {
-    case EBSDF:
+    case EShape:
       if (m_bsdf)
         throw NoriException(
             "Instance: tried to register multiple BSDF instances!");
       m_bsdf = static_cast<BSDF *>(obj);
       break;
-
-    case EEmitter: {
-      Emitter *emitter = static_cast<Emitter *>(obj);
-      if (m_emitter)
-        throw NoriException(
-            "Instance: tried to register multiple Emitter instances!");
-      m_emitter = emitter;
-    } break;
 
     default:
       throw NoriException("Instance::addChild(<%s>) is not supported!",
@@ -86,19 +53,8 @@ public:
   }
 
 private:
-  void updateRayAndHit(Ray3f &ray, Intersection &its, float t,
-                       const Normal3f &n) const {
-    ray.maxt = its.t = t;
-    its.p = ray(its.t);
-    its.uv = Point2f(its.p.x(), its.p.z());
-    its.bsdf = m_bsdf;
-    its.emitter = m_emitter;
-    its.geoFrame = its.shFrame = Frame(n);
-  }
-
-private:
-  BSDF *m_bsdf = nullptr;       ///< BSDF of the surface
-  Emitter *m_emitter = nullptr; ///< Associated emitter, if any
+  Transform *m_transform = nullptr;
+  Shape *m_shape = nullptr;
 };
 
 NORI_REGISTER_CLASS(Instance, "instance");
