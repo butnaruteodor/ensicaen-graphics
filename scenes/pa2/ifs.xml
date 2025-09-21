@@ -1,0 +1,26 @@
+<scene>
+  <!-- Independent sample generator -->
+  <sampler type="independent">
+    <integer name="sampleCount" value="8"/>
+  </sampler>
+
+  <!-- Simple integrator: show surface normals -->
+  <integrator type="normals"/>
+
+  <!-- Camera -->
+  <camera type="perspective">
+    <transform name="toWorld">
+      <lookat target="0, 0, 0" origin="5, 6, -10" up="0, 1, 0"/>
+    </transform>
+
+    <float name="fov" value="30"/>
+    <integer name="width" value="768"/>
+    <integer name="height" value="768"/>
+  </camera>
+
+  <!-- IFS fractal (e.g. Menger sponge style) -->
+  <shape type="ifs">
+    <!-- maximum subdivision depth -->
+    <integer name="iterations" value="5"/>
+  </shape>
+</scene>
