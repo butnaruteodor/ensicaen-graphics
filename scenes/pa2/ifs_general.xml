@@ -1,0 +1,55 @@
+<scene>
+  <sampler type="independent">
+    <integer name="sampleCount" value="8"/>
+  </sampler>
+
+  <integrator type="normals"/>
+
+  <camera type="perspective">
+    <transform name="toWorld">
+      <lookat target="0,0,0" origin="4,4,-8" up="0,1,0"/>
+    </transform>
+    <float name="fov" value="30"/>
+    <integer name="width" value="768"/>
+    <integer name="height" value="768"/>
+  </camera>
+
+  <shape type="ifs">
+    <integer name="iterations" value="4"/>
+    <integer name="numMaps" value="8"/>
+
+    <!-- 8 small cubes (Sierpinski-style) -->
+    <transform name="map1">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="0.5,-0.5,-0.5"/>
+    </transform>
+    <transform name="map2">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="0.5,-0.5,-0.5"/>
+    </transform>
+    <transform name="map3">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="-0.5,0.5,-0.5"/>
+    </transform>
+    <transform name="map4">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="0.5,0.5,-0.5"/>
+    </transform>
+    <transform name="map5">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="-0.5,-0.5,0.5"/>
+    </transform>
+    <transform name="map6">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="0.5,-0.5,0.5"/>
+    </transform>
+    <transform name="map7">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="-0.5,0.5,0.5"/>
+    </transform>
+    <transform name="map8">
+      <scale value="0.5,0.5,0.5"/>
+      <translate value="0.5,0.5,0.5"/>
+    </transform>
+  </shape>
+</scene>

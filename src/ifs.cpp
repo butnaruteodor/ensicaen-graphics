@@ -1,15 +1,28 @@
 #include <nori/bsdf.h>
 #include <nori/emitter.h>
 #include <nori/shape.h>
+#include <nori/transform.h>
 #include <iostream>
 
 NORI_NAMESPACE_BEGIN
 
+struct IFSMorphism {
+    Transform transform;
+};
+
 class IFSShape : public Shape {
 public:
     IFSShape(const PropertyList &props) {
-        m_iterations = props.getInteger("iterations", 5); // recursion depth
-        m_bounds = BoundingBox3f(Point3f(-1, -1, -1), Point3f(1, 1, 1)); // root cube
+        m_iterations = props.getInteger("iterations", 5);
+        int nMaps = props.getInteger("numMaps", 0);
+
+        for (int i = 1; i <= nMaps; ++i) {
+            std::string name = "map" + std::to_string(i);
+            Transform T = props.getTransform(name);
+            m_maps.push_back({ T.getMatrix() });
+        }
+
+        m_bounds = BoundingBox3f(Point3f(-1, -1, -1), Point3f(1, 1, 1));
     }
 
     void activate() {
@@ -37,13 +50,6 @@ public:
             m_bsdf = static_cast<BSDF *>(obj);
             break;
 
-        case EEmitter: {
-            Emitter *emitter = static_cast<Emitter *>(obj);
-            if (m_emitter)
-                throw NoriException("IFSShape: multiple Emitters!");
-            m_emitter = emitter;
-        } break;
-
         default:
             throw NoriException("IFSShape::addChild(<%s>) not supported!",
                                 classTypeName(obj->getClassType()));
@@ -64,39 +70,48 @@ public:
 
 private:
     bool intersectRecursive(Ray3f &ray, Intersection &its,
-                            const BoundingBox3f &bounds,
-                            int depth, bool shadowRay) const {
-        if (depth >= m_iterations) {
-            // At recursion limit → treat as hit
-            float tnear, tfar;
-            if (!bounds.rayIntersect(ray, tnear, tfar))
-                return false;
-
-            if (tnear >= ray.mint && tnear <= ray.maxt) {
-                if (shadowRay)
-                    return true;
-
-                updateRayAndHit(ray, its, tnear, bounds);
-                return true;
-            }
+                        const BoundingBox3f &bounds,
+                        int depth, bool shadowRay) const {
+    if (depth >= m_iterations) {
+        float tnear, tfar;
+        if (!bounds.rayIntersect(ray, tnear, tfar))
             return false;
-        }
 
-        // Generate IFS children (example: Menger sponge splits cube into 20 smaller ones)
-        std::vector<BoundingBox3f> children = subdivide(bounds);
-
-        bool hit = false;
-        for (const auto &child : children) {
-            float tnear, tfar;
-            if (child.rayIntersect(ray, tnear, tfar)) {
-                if (intersectRecursive(ray, its, child, depth + 1, shadowRay)) {
-                    hit = true;
-                    if (shadowRay) return true; // early exit
-                }
-            }
+        if (tnear >= ray.mint && tnear <= ray.maxt) {
+            if (shadowRay) return true;
+            updateRayAndHit(ray, its, tnear, bounds);
+            return true;
         }
-        return hit;
+        return false;
     }
+
+    // Compute 8 corners of current bounding box
+    Point3f corners[8];
+    corners[0] = bounds.min;
+    corners[1] = Point3f(bounds.max.x(), bounds.min.y(), bounds.min.z());
+    corners[2] = Point3f(bounds.min.x(), bounds.max.y(), bounds.min.z());
+    corners[3] = Point3f(bounds.min.x(), bounds.min.y(), bounds.max.z());
+    corners[4] = Point3f(bounds.max.x(), bounds.max.y(), bounds.min.z());
+    corners[5] = Point3f(bounds.max.x(), bounds.min.y(), bounds.max.z());
+    corners[6] = Point3f(bounds.min.x(), bounds.max.y(), bounds.max.z());
+    corners[7] = bounds.max;
+
+    // Apply all IFS maps
+    for (const auto &map : m_maps) {
+        BoundingBox3f child;
+        for (int i = 0; i < 8; ++i) {
+            Point3f tc = map.transform * corners[i];
+            child.expandBy(tc);
+        }
+
+        float tnear, tfar;
+        if (child.rayIntersect(ray, tnear, tfar)) {
+            if (intersectRecursive(ray, its, child, depth + 1, shadowRay))
+                return true;
+        }
+    }
+    return false;
+}
 
     /// Example subdivision rule (Menger sponge-like: keep 20 subcubes)
     std::vector<BoundingBox3f> subdivide(const BoundingBox3f &bounds) const {
@@ -143,6 +158,7 @@ private:
     Emitter *m_emitter = nullptr;
     int m_iterations;
     BoundingBox3f m_bounds;
+    std::vector<IFSMorphism> m_maps;
 };
 
 NORI_REGISTER_CLASS(IFSShape, "ifs")

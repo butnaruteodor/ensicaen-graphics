@@ -1,26 +1,48 @@
 <scene>
-  <!-- Independent sample generator -->
   <sampler type="independent">
     <integer name="sampleCount" value="8"/>
   </sampler>
 
-  <!-- Simple integrator: show surface normals -->
   <integrator type="normals"/>
 
-  <!-- Camera -->
   <camera type="perspective">
     <transform name="toWorld">
-      <lookat target="0, 0, 0" origin="5, 6, -10" up="0, 1, 0"/>
+      <lookat target="0,0,0" origin="4,4,-8" up="0,1,0"/>
     </transform>
-
     <float name="fov" value="30"/>
     <integer name="width" value="768"/>
     <integer name="height" value="768"/>
   </camera>
 
-  <!-- IFS fractal (e.g. Menger sponge style) -->
   <shape type="ifs">
-    <!-- maximum subdivision depth -->
-    <integer name="iterations" value="5"/>
+    <integer name="iterations" value="3"/>
+    <integer name="numMaps" value="20"/>
+
+    <!-- Bottom layer -->
+    <transform name="map1"><scale value="0.333,0.333,0.333"/><translate value="-0.333,-0.333,-0.333"/></transform>
+    <transform name="map2"><scale value="0.333,0.333,0.333"/><translate value="0,-0.333,-0.333"/></transform>
+    <transform name="map3"><scale value="0.333,0.333,0.333"/><translate value="0.333,-0.333,-0.333"/></transform>
+    <transform name="map4"><scale value="0.333,0.333,0.333"/><translate value="-0.333,-0.333,0"/></transform>
+    <transform name="map5"><scale value="0.333,0.333,0.333"/><translate value="0.333,-0.333,0"/></transform>
+    <transform name="map6"><scale value="0.333,0.333,0.333"/><translate value="-0.333,-0.333,0.333"/></transform>
+    <transform name="map7"><scale value="0.333,0.333,0.333"/><translate value="0,-0.333,0.333"/></transform>
+    <transform name="map8"><scale value="0.333,0.333,0.333"/><translate value="0.333,-0.333,0.333"/></transform>
+
+    <!-- Middle layer -->
+    <transform name="map9"><scale value="0.333,0.333,0.333"/><translate value="-0.333,0, -0.333"/></transform>
+    <transform name="map10"><scale value="0.333,0.333,0.333"/><translate value="0.333,0,-0.333"/></transform>
+    <transform name="map11"><scale value="0.333,0.333,0.333"/><translate value="-0.333,0,0.333"/></transform>
+    <transform name="map12"><scale value="0.333,0.333,0.333"/><translate value="0.333,0,0.333"/></transform>
+
+    <!-- Top layer -->
+    <transform name="map13"><scale value="0.333,0.333,0.333"/><translate value="-0.333,0.333,-0.333"/></transform>
+    <transform name="map14"><scale value="0.333,0.333,0.333"/><translate value="0,0.333,-0.333"/></transform>
+    <transform name="map15"><scale value="0.333,0.333,0.333"/><translate value="0.333,0.333,-0.333"/></transform>
+    <transform name="map16"><scale value="0.333,0.333,0.333"/><translate value="-0.333,0.333,0"/></transform>
+    <transform name="map17"><scale value="0.333,0.333,0.333"/><translate value="0.333,0.333,0"/></transform>
+    <transform name="map18"><scale value="0.333,0.333,0.333"/><translate value="-0.333,0.333,0.333"/></transform>
+    <transform name="map19"><scale value="0.333,0.333,0.333"/><translate value="0,0.333,0.333"/></transform>
+    <transform name="map20"><scale value="0.333,0.333,0.333"/><translate value="0.333,0.333,0.333"/></transform>
+
   </shape>
 </scene>
