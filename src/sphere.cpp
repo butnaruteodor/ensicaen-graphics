@@ -20,7 +20,7 @@ public:
                     bool shadowRay = false) const {
     // Parameters
     Normal3f n(0, 1, 0); // Color
-    float radius = 2;    // Sphere radius
+    float radius = 1;    // Sphere radius
 
     // Solution calculation
     float denominator = 2 * ray.d.dot(ray.d);

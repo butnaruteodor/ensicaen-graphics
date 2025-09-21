@@ -3,13 +3,14 @@
 #include <nori/shape.h>
 #include <nori/transform.h>
 #include <iostream>
-
+static int count = 0;
 NORI_NAMESPACE_BEGIN
 class Instance : public Shape {
 public:
   Instance(const PropertyList &props) {
     // Get transform
-    // Get shape
+    m_transform = props.getTransform("toWorld");
+    //std::cout<<"Here\n"<<m_transform.toString();
   }
 
   void activate() {
@@ -23,17 +24,26 @@ public:
   bool rayIntersect(Ray3f &ray, Intersection &its,
                     bool shadowRay = false) const {
     // Inverse ray and call rayIntersect of child objects
-
+    Ray3f localRay = m_transform.inverse()*ray;
+    bool hit = m_shape->rayIntersect(localRay, its, shadowRay);
+    if (hit) {
+        // Transform intersection data back to world space
+        its.p = m_transform*its.p;
+        its.shFrame.n = m_transform*its.shFrame.n;
+        //its.geoFrame.n = m_transform*its.geoFrame.n;
+        ray.maxt = localRay.maxt;
+    }
+    return hit;
   }
 
   /// Register a child object (e.g. a BSDF) with the mesh
   void addChild(NoriObject *obj) {
     switch (obj->getClassType()) {
     case EShape:
-      if (m_bsdf)
-        throw NoriException(
-            "Instance: tried to register multiple BSDF instances!");
-      m_bsdf = static_cast<BSDF *>(obj);
+      if (m_shape)
+          throw NoriException(
+              "Sphere: tried to register multiple shape instances!");
+      m_shape = static_cast<Shape *>(obj);
       break;
 
     default:
@@ -53,8 +63,10 @@ public:
   }
 
 private:
-  Transform *m_transform = nullptr;
+  Transform m_transform;
   Shape *m_shape = nullptr;
+  BSDF *m_bsdf = nullptr;       ///< BSDF of the surface
+  Emitter *m_emitter = nullptr; ///< Associated emitter, if any
 };
 
 NORI_REGISTER_CLASS(Instance, "instance");
