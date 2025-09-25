@@ -113,26 +113,6 @@ private:
     return false;
 }
 
-    /// Example subdivision rule (Menger sponge-like: keep 20 subcubes)
-    std::vector<BoundingBox3f> subdivide(const BoundingBox3f &bounds) const {
-    std::vector<BoundingBox3f> children;
-    Vector3f size = bounds.getExtents() / 3.0f;
-
-    for (int i = 0; i < 3; ++i) {
-        for (int j = 0; j < 3; ++j) {
-            for (int k = 0; k < 3; ++k) {
-                if ((i == 1 && j == 1) || (i == 1 && k == 1) || (j == 1 && k == 1)) {
-                    continue; // remove center cubes
-                }
-                Point3f min = bounds.min + Vector3f(i, j, k).cwiseProduct(size);
-                Point3f max = min + size;
-                children.push_back(BoundingBox3f(min, max));
-            }
-        }
-    }
-    return children;
-}
-
     void updateRayAndHit(Ray3f &ray, Intersection &its, float t,
                          const BoundingBox3f &bounds) const {
         ray.maxt = its.t = t;
