@@ -91,6 +91,26 @@ public:
 };
 
 
+std::vector<BoundingBox3f> subdivideBoundingBox(const BoundingBox3f &box) {
+    std::vector<BoundingBox3f> children(8);
+    Point3f min = box.min;
+    Point3f max = box.max;
+    Point3f center = box.getCenter();
+
+    // Define the 8 sub-boxes (octants)
+    // Each child box is defined by min/max corners based on center splits
+    children[0] = BoundingBox3f{min, center};
+    children[1] = BoundingBox3f{Point3f(center.x(), min.y(), min.z()), Point3f(max.x(), center.y(), center.z())};
+    children[2] = BoundingBox3f{Point3f(min.x(), center.y(), min.z()), Point3f(center.x(), max.y(), center.z())};
+    children[3] = BoundingBox3f{Point3f(center.x(), center.y(), min.z()), Point3f(max.x(), max.y(), center.z())};
+    children[4] = BoundingBox3f{Point3f(min.x(), min.y(), center.z()), Point3f(center.x(), center.y(), max.z())};
+    children[5] = BoundingBox3f{Point3f(center.x(), min.y(), center.z()), Point3f(max.x(), center.y(), max.z())};
+    children[6] = BoundingBox3f{Point3f(min.x(), center.y(), center.z()), Point3f(center.x(), max.y(), max.z())};
+    children[7] = BoundingBox3f{center, max};
+
+    return children;
+}
+
 OctreeNode*
 Accel::build(const BoundingBox3f& bbox, const Triangles & triangles){
   //todo (Part 1): fill in this part to construct the Octree
@@ -99,21 +119,23 @@ Accel::build(const BoundingBox3f& bbox, const Triangles & triangles){
     return new OctreeLeaf(bbox,triangles);
   }
 
-  Triangles triangle_list;
+  Triangles triangle_list[8];
+  std::vector<BoundingBox3f> childrenBoxes = subdivideBoundingBox(bbox);
   for (auto idx : triangles) {
+    BoundingBox3f tri_bbox = getBoundingBox(idx);
     for (int i = 0; i < 8; ++i) {
-      if (triangle overlaps sub-node i) {
-        add to list[i];
+      if (tri_bbox.overlaps(childrenBoxes[i])) {
+        triangle_list[i].push_back(idx);
         //! beware infinite recursion if "list[i]==triangles"
-        if (list[i].size() == triangles.size())
-          return new leaf node with triangles
+        if (triangle_list[i].size() == triangles.size())
+          return new OctreeLeaf(bbox,triangles);
       }
     }
   }
 
-  OctreeNode *node = new OctreeNode(box);
+  OctreeNode *node = new OctreeNode(bbox);
   for (int i = 0; i < 8; ++i)
-  node.child[i] = build(bounding box of sub-node i, list[i]);
+    node->children[i] = build(childrenBoxes[i], triangle_list[i]);
   return node;
 }
 
@@ -139,6 +161,22 @@ void Accel::clear() {
     m_meshOffset.shrink_to_fit();
     delete m_octree;
 }
+void collectTriangles(OctreeNode* node, std::set<Triangle>& output) {
+    if (!node)
+        return;
+
+    if (node->is_leaf()) {
+        const Triangle* tris = node->getTriangles();
+        unsigned int count = node->nbTriangles();
+        for (unsigned int i = 0; i < count; ++i) {
+            output.insert(tris[i]);
+        }
+    } else {
+        for (int i = 0; i < 8; ++i) {
+            collectTriangles(node->children[i], output);
+        }
+    }
+}
 
 void Accel::activate() {
     uint32_t size  = getTriangleCount();
@@ -153,7 +191,7 @@ void Accel::activate() {
     m_octree = build(m_bbox, m_triangles); 
     std::set<Triangle> all_triangles;
     {
-      //! todo (Part 1 test): store all the triangles of the octree in a std::set
+      collectTriangles(m_octree, all_triangles);
     }
     cout << "done (took " << timer.elapsedString() << ")." << endl;
     if (all_triangles.size() == m_triangles.size()) {
@@ -180,6 +218,7 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
     uint32_t f = 0;
 
     {
+      
       //! todo (Part 2): replace this search with the Octree traversal
       /* Brute force search through all triangles */
       for (auto idx : m_triangles) {
