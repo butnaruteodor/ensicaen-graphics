@@ -218,7 +218,14 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
     uint32_t f = 0;
 
     {
-      
+      float nearT, farT;
+      std::stack<OctreeNode*> stack;
+      stack.push(m_octree);
+      // for(auto node : m_octree){
+        if(m_octree->bbox.rayIntersect(ray, nearT, farT)){
+          std::cout<<"Intersecting node\n";
+        }
+      //}
       //! todo (Part 2): replace this search with the Octree traversal
       /* Brute force search through all triangles */
       for (auto idx : m_triangles) {
