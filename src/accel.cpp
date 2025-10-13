@@ -221,27 +221,38 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
       float nearT, farT;
       std::stack<OctreeNode*> stack;
       stack.push(m_octree);
-      // for(auto node : m_octree){
-        if(m_octree->bbox.rayIntersect(ray, nearT, farT)){
-          std::cout<<"Intersecting node\n";
-        }
-      //}
-      //! todo (Part 2): replace this search with the Octree traversal
-      /* Brute force search through all triangles */
-      for (auto idx : m_triangles) {
-        uint32_t local_idx = idx;
-        auto mesh = getMesh(findMesh(local_idx));
-        float u, v, t;
-        if (mesh->rayIntersect(idx, ray, u, v, t)) {
-          /* An intersection was found! Can terminate
-             immediately if this is a shadow ray query */
-          if (shadowRay)
-            return true;
-          hitmesh = mesh;
-          ray.maxt = its.t = t;
-          its.uv = Point2f(u, v);
-          f = idx;
-          foundIntersection = true;
+
+      while (!stack.empty()) {
+        OctreeNode* node = stack.top();
+        stack.pop();
+
+        if (!node->bbox.rayIntersect(ray)) continue;
+
+        if (node->is_leaf()) {
+          const Triangle* tris = node->getTriangles();
+          unsigned int count = node->nbTriangles();
+          for (unsigned int i = 0; i<count; i++){
+            auto localidx = tris[i];
+            auto mesh = getMesh(findMesh(localidx));
+            float u, v, t;
+            if (mesh->rayIntersect(localidx, ray, u, v, t)) {
+              /* An intersection was found! Can terminate
+                immediately if this is a shadow ray query */
+              if (shadowRay)
+                return true;
+              hitmesh = mesh;
+              ray.maxt = its.t = t;
+              its.uv = Point2f(u, v);
+              f = localidx;
+              foundIntersection = true;
+            }
+          }
+        }else {
+          for (int i = 0; i < 8; ++i) {
+            if (node->children[i]) {
+                stack.push(node->children[i]);
+            }
+          }
         }
       }
     }
