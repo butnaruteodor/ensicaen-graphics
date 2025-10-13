@@ -218,7 +218,6 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
     uint32_t f = 0;
 
     {
-      float nearT, farT;
       std::stack<OctreeNode*> stack;
       stack.push(m_octree);
 
@@ -248,10 +247,21 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
             }
           }
         }else {
+          std::vector<std::pair<float, OctreeNode*>> sortedChildren;
+          float nearT, farT;
           for (int i = 0; i < 8; ++i) {
-            if (node->children[i]) {
-                stack.push(node->children[i]);
-            }
+            OctreeNode* child = node->children[i];
+            if (!child) continue;
+            if (!node->bbox.rayIntersect(ray, nearT, farT)) continue;
+            float distance = child->bbox.distanceTo(ray.o);
+            sortedChildren.emplace_back(distance, child);
+          }
+          std::sort(sortedChildren.begin(), sortedChildren.end(),
+          [](const auto& a, const auto& b) {
+              return a.first < b.first; // ascending order by distance
+          });
+          for (auto it = sortedChildren.rbegin(); it != sortedChildren.rend(); ++it) {
+            stack.push(it->second);
           }
         }
       }
