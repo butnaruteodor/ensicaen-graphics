@@ -253,7 +253,9 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
             OctreeNode* child = node->children[i];
             if (!child) continue;
             if (!node->bbox.rayIntersect(ray, nearT, farT)) continue;
+            if (nearT > ray.maxt) continue;
             float distance = child->bbox.distanceTo(ray.o);
+
             sortedChildren.emplace_back(distance, child);
           }
           std::sort(sortedChildren.begin(), sortedChildren.end(),
