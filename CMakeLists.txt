@@ -96,6 +96,9 @@ add_executable(nori
   src/box.cpp
   src/instance.cpp
   src/ifs.cpp
+  src/ao.cpp
+  src/simple.cpp
+  src/area.cpp
 )
 
 add_definitions(${NANOGUI_EXTRA_DEFS})
