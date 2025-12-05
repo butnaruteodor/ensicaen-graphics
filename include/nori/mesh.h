@@ -143,6 +143,8 @@ protected:
     BSDF         *m_bsdf = nullptr;      ///< BSDF of the surface
     Emitter    *m_emitter = nullptr;     ///< Associated emitter, if any
     BoundingBox3f m_bbox;                ///< Bounding box of the mesh
+    std::unique_ptr<DiscretePDF> m_pdf;
+    float m_surfaceArea = 0.0f;
 };
 
 NORI_NAMESPACE_END
