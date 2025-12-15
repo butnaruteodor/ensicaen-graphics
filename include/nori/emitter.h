@@ -22,6 +22,14 @@
 
 NORI_NAMESPACE_BEGIN
 
+struct EmitterQueryRecord {
+    Point3f ref;   // shading point x
+    Point3f p;     // sampled point y
+    Normal3f n;    // normal at y
+    Vector3f wi;   // direction x -> y
+    float dist;    // |x - y|
+};
+
 /**
  * \brief Superclass of all emitters
  */
@@ -33,6 +41,13 @@ public:
      * provided by this instance
      * */
     EClassType getClassType() const { return EEmitter; }
+    virtual Color3f eval(const EmitterQueryRecord &lRec) const = 0;
+
+    virtual Color3f sample(EmitterQueryRecord &lRec,
+                            const Point2f &sample,
+                            float &pdf) const = 0;
+
+    virtual float pdf(const EmitterQueryRecord &lRec) const = 0;
 };
 
 NORI_NAMESPACE_END

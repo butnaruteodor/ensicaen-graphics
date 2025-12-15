@@ -58,11 +58,11 @@ public:
 
     /// Construct a vector from MatrixBase (needed to play nice with Eigen)
     template <typename Derived> TVector(const Eigen::MatrixBase<Derived>& p)
-        : Base(p) { }
+        : Base(p.template cast<Scalar>()) { }
 
     /// Assign a vector from MatrixBase (needed to play nice with Eigen)
     template <typename Derived> TVector &operator=(const Eigen::MatrixBase<Derived>& p) {
-        this->Base::operator=(p);
+        this->Base::operator=(p.template cast<Scalar>());
         return *this;
     }
 
@@ -106,11 +106,11 @@ public:
 
     /// Construct a point from MatrixBase (needed to play nice with Eigen)
     template <typename Derived> TPoint(const Eigen::MatrixBase<Derived>& p)
-        : Base(p) { }
+        : Base(p.template cast<Scalar>()) { }
 
     /// Assign a point from MatrixBase (needed to play nice with Eigen)
     template <typename Derived> TPoint &operator=(const Eigen::MatrixBase<Derived>& p) {
-        this->Base::operator=(p);
+        this->Base::operator=(p.template cast<Scalar>());
         return *this;
     }
 
@@ -149,11 +149,11 @@ public:
 
     /// Construct a normal from MatrixBase (needed to play nice with Eigen)
     template <typename Derived> Normal3f(const Eigen::MatrixBase<Derived>& p)
-        : Base(p) { }
+        : Base(p.template cast<Scalar>()) { }
 
     /// Assign a normal from MatrixBase (needed to play nice with Eigen)
     template <typename Derived> Normal3f &operator=(const Eigen::MatrixBase<Derived>& p) {
-        this->Base::operator=(p);
+        this->Base::operator=(p.template cast<Scalar>());
         return *this;
     }
 

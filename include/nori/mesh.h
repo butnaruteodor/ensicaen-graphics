@@ -21,6 +21,7 @@
 #include <nori/object.h>
 #include <nori/frame.h>
 #include <nori/bbox.h>
+#include <nori/dpdf.h>
 
 NORI_NAMESPACE_BEGIN
 
@@ -54,6 +55,7 @@ public:
 
     /// Return the surface area of the given triangle
     float surfaceArea(uint32_t index) const;
+    float getTotalArea() const { return m_totalArea; }
 
     //// Return an axis-aligned bounding box of the entire mesh
     const BoundingBox3f &getBoundingBox() const { return m_bbox; }
@@ -143,6 +145,8 @@ protected:
     BSDF         *m_bsdf = nullptr;      ///< BSDF of the surface
     Emitter    *m_emitter = nullptr;     ///< Associated emitter, if any
     BoundingBox3f m_bbox;                ///< Bounding box of the mesh
+    DiscretePDF m_areaPDF;
+    float m_totalArea = 0.f;
 };
 
 NORI_NAMESPACE_END

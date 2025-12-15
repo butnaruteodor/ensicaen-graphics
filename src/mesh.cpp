@@ -39,6 +39,16 @@ void Mesh::activate() {
         m_bsdf = static_cast<BSDF *>(
             NoriObjectFactory::createInstance("diffuse", PropertyList()));
     }
+    m_areaPDF.clear();
+    m_totalArea = 0.f;
+
+    for (uint32_t i = 0; i < getTriangleCount(); ++i) {
+        float area = surfaceArea(i);
+        m_areaPDF.append(area);
+        m_totalArea += area;
+    }
+
+    m_areaPDF.normalize();
 }
 
 float Mesh::surfaceArea(uint32_t index) const {
@@ -101,6 +111,42 @@ Point3f Mesh::getCentroid(uint32_t index) const {
          m_V.col(m_F(1, index)) +
          m_V.col(m_F(2, index)));
 }
+void Mesh::samplePosition(const Point2f &sample,
+                          Point3f &p,
+                          Normal3f &n) const {
+    // 1. Sample a triangle proportional to area
+    float pdfTri;
+    uint32_t triIndex = m_areaPDF.sample(sample.x(), pdfTri);
+
+    const Vector3i &f = m_F.col(triIndex);
+
+    const Point3f &v0 = m_V.col(f[0]);
+    const Point3f &v1 = m_V.col(f[1]);
+    const Point3f &v2 = m_V.col(f[2]);
+
+    // 2. Uniform barycentric sampling
+    // (classic sqrt trick)
+    float r1 = std::sqrt(sample.y());
+    float r2 = sample.y();
+
+    float b0 = 1.f - r1;
+    float b1 = r1 * (1.f - r2);
+    float b2 = r1 * r2;
+
+    p = b0 * v0 + b1 * v1 + b2 * v2;
+
+    // 3. Normal interpolation
+    if (m_N.size() > 0) {
+        const Normal3f &n0 = m_N.col(f[0]);
+        const Normal3f &n1 = m_N.col(f[1]);
+        const Normal3f &n2 = m_N.col(f[2]);
+
+        n = (b0 * n0 + b1 * n1 + b2 * n2).normalized();
+    } else {
+        n = ((v1 - v0).cross(v2 - v0)).normalized();
+    }
+}
+
 
 void Mesh::addChild(NoriObject *obj) {
     switch (obj->getClassType()) {
