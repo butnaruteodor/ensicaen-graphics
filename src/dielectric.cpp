@@ -21,32 +21,59 @@
 
 NORI_NAMESPACE_BEGIN
 
-/// Ideal dielectric BSDF
 class Dielectric : public BSDF {
 public:
     Dielectric(const PropertyList &propList) {
-        /* Interior IOR (default: BK7 borosilicate optical glass) */
         m_intIOR = propList.getFloat("intIOR", 1.5046f);
-
-        /* Exterior IOR (default: air) */
         m_extIOR = propList.getFloat("extIOR", 1.000277f);
     }
 
-    Color3f eval(const BSDFQueryRecord &) const {
-        /* Discrete BRDFs always evaluate to zero in Nori */
-        return Color3f(0.0f);
+    Color3f eval(const BSDFQueryRecord &) const override {
+        return Color3f(0.0f); // discrete BRDF
     }
 
-    float pdf(const BSDFQueryRecord &) const {
-        /* Discrete BRDFs always evaluate to zero in Nori */
-        return 0.0f;
+    float pdf(const BSDFQueryRecord &) const override {
+        return 0.0f; // discrete BRDF
     }
 
-    Color3f sample(BSDFQueryRecord &bRec, const Point2f &sample) const {
-        throw NoriException("Unimplemented!");
+    Color3f sample(BSDFQueryRecord &bRec, const Point2f &sample) const override {
+        bool entering = bRec.wi.z() > 0;
+        float etaI = entering ? m_extIOR : m_intIOR;
+        float etaT = entering ? m_intIOR : m_extIOR;
+
+        Vector3f n(0,0,1);
+        if (!entering) n = -n;
+
+        float cosThetaI = bRec.wi.dot(n);
+        float eta = etaI / etaT;
+
+        float sinThetaTSq = eta*eta * (1 - cosThetaI*cosThetaI);
+
+        // total internal reflection
+        if (sinThetaTSq > 1.0f) {
+            bRec.wo = Vector3f(-bRec.wi.x(), -bRec.wi.y(), bRec.wi.z());
+            return Color3f(1.0f);
+        }
+
+        float cosThetaT = std::sqrt(1 - sinThetaTSq);
+
+        // Fresnel reflectance (Schlick)
+        float R0 = (etaI - etaT) / (etaI + etaT);
+        R0 = R0 * R0;
+        float R = R0 + (1 - R0) * std::pow(1 - cosThetaI, 5);
+
+        if (sample.x() < R) {
+            // reflection
+            bRec.wo = Vector3f(-bRec.wi.x(), -bRec.wi.y(), bRec.wi.z());
+            return Color3f(R);
+        } else {
+            // refraction
+            bRec.wo = eta * -bRec.wi + (eta * cosThetaI - cosThetaT) * n;
+            return Color3f(1.0f - R);
+        }
     }
 
-    std::string toString() const {
+    std::string toString() const override {
         return tfm::format(
             "Dielectric[\n"
             "  intIOR = %f,\n"
@@ -54,9 +81,11 @@ public:
             "]",
             m_intIOR, m_extIOR);
     }
+
 private:
     float m_intIOR, m_extIOR;
 };
 
 NORI_REGISTER_CLASS(Dielectric, "dielectric");
+
 NORI_NAMESPACE_END
