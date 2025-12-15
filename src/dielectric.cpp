@@ -37,41 +37,47 @@ public:
     }
 
     Color3f sample(BSDFQueryRecord &bRec, const Point2f &sample) const override {
+        // Determine entering/exiting
         bool entering = bRec.wi.z() > 0;
         float etaI = entering ? m_extIOR : m_intIOR;
         float etaT = entering ? m_intIOR : m_extIOR;
-
-        Vector3f n(0,0,1);
-        if (!entering) n = -n;
-
-        float cosThetaI = bRec.wi.dot(n);
         float eta = etaI / etaT;
 
+        // Normal pointing against incoming ray
+        Vector3f n = entering ? Vector3f(0,0,1) : Vector3f(0,0,-1);
+
+        float cosThetaI = bRec.wi.dot(n);
         float sinThetaTSq = eta*eta * (1 - cosThetaI*cosThetaI);
 
-        // total internal reflection
+        bRec.measure = EDiscrete;
+        bRec.eta = eta;
+
+        // Total internal reflection
         if (sinThetaTSq > 1.0f) {
-            bRec.wo = Vector3f(-bRec.wi.x(), -bRec.wi.y(), bRec.wi.z());
+            // Reflect across normal
+            bRec.wo = bRec.wi - 2.f * bRec.wi.dot(n) * n;
             return Color3f(1.0f);
         }
 
         float cosThetaT = std::sqrt(1 - sinThetaTSq);
 
-        // Fresnel reflectance (Schlick)
+        // Fresnel (Schlick)
         float R0 = (etaI - etaT) / (etaI + etaT);
-        R0 = R0 * R0;
+        R0 *= R0;
         float R = R0 + (1 - R0) * std::pow(1 - cosThetaI, 5);
 
         if (sample.x() < R) {
-            // reflection
-            bRec.wo = Vector3f(-bRec.wi.x(), -bRec.wi.y(), bRec.wi.z());
+            // Reflection
+            bRec.wo = bRec.wi - 2.f * bRec.wi.dot(n) * n;
             return Color3f(R);
         } else {
-            // refraction
-            bRec.wo = eta * -bRec.wi + (eta * cosThetaI - cosThetaT) * n;
+            // Refraction
+            bRec.wo = -eta * bRec.wi + (eta * cosThetaI - cosThetaT) * n;
             return Color3f(1.0f - R);
         }
     }
+
+
 
     std::string toString() const override {
         return tfm::format(

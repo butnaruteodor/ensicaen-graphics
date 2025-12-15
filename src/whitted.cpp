@@ -17,18 +17,36 @@ public:
         m_energy   = props.getColor("energy",  Color3f(1.0f));
         
     }
+Color3f Li(const Scene* scene, Sampler* sampler, const Ray3f &ray) const override {
+    return LiRecursive(scene, sampler, ray, 0);
+}
 
-    Color3f Li(const Scene *scene, Sampler *sampler, const Ray3f &ray) const {
+private:
+Color3f LiRecursive(const Scene* scene, Sampler* sampler, const Ray3f &ray, int depth) const {
+    if (depth > 10)
+        return Color3f(0.f);
+
     Intersection its;
     if (!scene->rayIntersect(ray, its))
         return Color3f(0.f); // background
 
     Color3f Lo(0.f);
-
-    // outgoing direction
     Vector3f wo = -ray.d;
 
-    // Iterate over all meshes in the scene
+    if (!its.bsdf->isDiffuse()) {
+        BSDFQueryRecord bRec(its.shFrame.toLocal(wo));
+        Point2f xi = sampler->next2D();
+
+        Color3f f = its.bsdf->sample(bRec, xi);
+        Ray3f reflRay(its.p, its.shFrame.toWorld(bRec.wo), Epsilon, std::numeric_limits<float>::infinity());
+
+        if (xi.y() < 0.95f)
+            Lo += f * LiRecursive(scene, sampler, reflRay, depth + 1) / 0.95f;
+
+        return Lo;
+    }
+
+    // Diffuse surface: sample emitters
     for (uint32_t i = 0; i < scene->getAccel()->getMeshCount(); ++i) {
         const Mesh* mesh = scene->getAccel()->getMesh(i);
         if (!mesh->isEmitter())
@@ -43,27 +61,27 @@ public:
         if (pdf == 0.f || Le.isZero())
             continue;
 
-        // Shadow ray
         Ray3f shadowRay(its.p, lRec.wi, Epsilon, lRec.dist - Epsilon);
         if (scene->rayIntersect(shadowRay))
             continue;
 
-        // BSDF
         BSDFQueryRecord bRec(its.shFrame.toLocal(lRec.wi),
-                            its.shFrame.toLocal(-ray.d),
-                            ESolidAngle);
+                             its.shFrame.toLocal(-ray.d),
+                             ESolidAngle);
         Color3f fr = its.bsdf->eval(bRec);
 
-        // Geometry term
         float G = std::abs(its.shFrame.n.dot(lRec.wi)) *
-                std::abs(lRec.n.dot(-lRec.wi)) /
-                (lRec.dist * lRec.dist);
+                  std::abs(lRec.n.dot(-lRec.wi)) /
+                  (lRec.dist * lRec.dist);
 
         Lo += fr * Le * G / pdf;
     }
 
     return Lo;
 }
+
+
+
 
 
     std::string toString() const {
