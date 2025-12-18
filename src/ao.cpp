@@ -7,7 +7,6 @@ NORI_NAMESPACE_BEGIN
 class AoIntegrator : public Integrator {
 public:
     AoIntegrator(const PropertyList &props) {
-        /* No parameters this time */
     }
 
     Color3f Li(const Scene *scene, Sampler *sampler, const Ray3f &ray) const {
@@ -25,7 +24,7 @@ public:
         // Shoot shadow ray for visibility
         Ray3f shadowRay(its.p, w, Epsilon, std::numeric_limits<float>::infinity());
 
-        // If the ray hits something → occluded
+        // If the ray hits something => occluded
         bool occluded = scene->rayIntersect(shadowRay);
 
         // AO returns visibility: 1 if visible, 0 if blocked

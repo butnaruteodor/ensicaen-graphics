@@ -22,12 +22,12 @@ public:
         float dist  = std::sqrt(dist2);
         lightDir.normalize();
 
-        // cosθ = n ⋅ ω
+        // cos_theta = n ⋅ w
         float cosTheta = its.shFrame.n.dot(lightDir);
         if (cosTheta <= 0.0f)
             return Color3f(0.0f); // light below surface
 
-        // Shadow ray: origin = x, direction = ω
+        // Shadow ray: origin = x, direction = w
         Ray3f shadowRay(its.p, lightDir, Epsilon, dist - Epsilon);
 
         // Visibility check
@@ -36,7 +36,7 @@ public:
             return Color3f(0.0f);
 
         // Final radiance:
-        //   Φ / (4π r²) * cosθ
+        //   Phi / (4pi r_squared) * cos_theta
         return m_energy * (cosTheta / (4.0f * M_PI * dist2));
     }
 

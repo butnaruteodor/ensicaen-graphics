@@ -31,9 +31,7 @@ private:
 
         // Check if surface is specular or diffuse
         if (!its.bsdf->isDiffuse()) {
-            // ================================================================
             // SPECULAR CASE: reflect/refract
-            // ================================================================
             BSDFQueryRecord bRec(its.toLocal(-ray.d));
             Color3f c = its.bsdf->sample(bRec, sampler->next2D());
             
@@ -48,9 +46,7 @@ private:
             }
             return Lo;
         } else {
-            // ================================================================
             // DIFFUSE CASE: direct lighting from emitters
-            // ================================================================
             // Iterate over all meshes and find those that are emitters
             for (uint32_t meshIdx = 0; meshIdx < scene->getAccel()->getMeshCount(); ++meshIdx) {
                 const Mesh* mesh = scene->getAccel()->getMesh(meshIdx);
@@ -87,10 +83,6 @@ private:
             return Lo;
         }
     }
-
-
-
-
 
     std::string toString() const override {
         return "WhittedIntegrator[]";

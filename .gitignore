@@ -8,6 +8,7 @@ CMakeSettings.json
 CMakeFiles
 Makefile
 *.cmake
+*.m
 .ninja_deps
 .ninja_log
 build.ninja
