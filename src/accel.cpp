@@ -247,21 +247,34 @@ bool Accel::rayIntersect(Ray3f &_ray, Intersection &its, bool shadowRay) const {
             }
           }
         }else {
+          // Collect children that intersect the ray
           std::vector<std::pair<float, OctreeNode*>> sortedChildren;
-          float nearT, farT;
+          sortedChildren.reserve(8); // Pre-allocate max 8 children
+          
           for (int i = 0; i < 8; ++i) {
             OctreeNode* child = node->children[i];
             if (!child) continue;
-            if (!node->bbox.rayIntersect(ray, nearT, farT)) continue;
+            
+            // Check intersection with child's bbox
+            float nearT, farT;
+            if (!child->bbox.rayIntersect(ray, nearT, farT)) continue;
+            
+            // Cull if child is beyond current closest intersection
             if (nearT > ray.maxt) continue;
-            float distance = child->bbox.distanceTo(ray.o);
-
-            sortedChildren.emplace_back(distance, child);
+            
+            // Add to candidates for sorting
+            sortedChildren.emplace_back(nearT, child);
           }
-          std::sort(sortedChildren.begin(), sortedChildren.end(),
-          [](const auto& a, const auto& b) {
-              return a.first < b.first; // ascending order by distance
-          });
+          
+          // Only sort if we have multiple candidates
+          if (sortedChildren.size() > 1) {
+            std::sort(sortedChildren.begin(), sortedChildren.end(),
+              [](const auto& a, const auto& b) {
+                return a.first < b.first;
+              });
+          }
+          
+          // Push in reverse order so closest is processed first
           for (auto it = sortedChildren.rbegin(); it != sortedChildren.rend(); ++it) {
             stack.push(it->second);
           }

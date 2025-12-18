@@ -50,17 +50,86 @@ public:
 
     /// Evaluate the BRDF for the given pair of directions
     Color3f eval(const BSDFQueryRecord &bRec) const {
-    	throw NoriException("MicrofacetBRDF::eval(): not implemented!");
+        if (Frame::cosTheta(bRec.wi) <= 0 || Frame::cosTheta(bRec.wo) <= 0) return Color3f(0.0f);
+
+        Vector3f wi = bRec.wi;
+        Vector3f wo = bRec.wo;
+        Vector3f wh = (wi + wo).normalized();
+
+        float cosThetaI = Frame::cosTheta(wi);
+        float cosThetaO = Frame::cosTheta(wo);
+
+        // Diffuse term
+        Color3f diffuse = m_kd * INV_PI;
+
+        // Specular term
+        float D = Warp::squareToBeckmannPdf(wh, m_alpha);
+        float F = fresnel(wi.dot(wh), m_extIOR, m_intIOR);
+        float G = smithG1(wi, wh) * smithG1(wo, wh);
+
+        Color3f specular(0.0f);
+        float denom = 4.0f * cosThetaI * cosThetaO;
+        if (denom > 0.0f)
+            specular = Color3f(D * F * G / denom);
+
+        return diffuse + m_ks * specular;
     }
 
     /// Evaluate the sampling density of \ref sample() wrt. solid angles
     float pdf(const BSDFQueryRecord &bRec) const {
-    	throw NoriException("MicrofacetBRDF::pdf(): not implemented!");
+    	if (Frame::cosTheta(bRec.wo) <= 0)
+            return 0.0f;
+
+        Vector3f wh = (bRec.wi + bRec.wo).normalized();
+
+        float pdfSpec = 0.0f;
+        float dotOH = bRec.wo.dot(wh);
+        if (dotOH > 0.0f) {
+            float Jh = 1.0f / (4.0f * dotOH);
+            pdfSpec = Warp::squareToBeckmannPdf(wh, m_alpha) * Jh;
+        }
+
+        float pdfDiff =
+            Warp::squareToCosineHemispherePdf(bRec.wo);
+
+        return m_ks * pdfSpec + (1.0f - m_ks) * pdfDiff;
     }
 
     /// Sample the BRDF
     Color3f sample(BSDFQueryRecord &bRec, const Point2f &_sample) const {
-    	throw NoriException("MicrofacetBRDF::sample(): not implemented!");
+    	if (Frame::cosTheta(bRec.wi) <= 0)
+            return Color3f(0.0f);
+
+        Point2f sample = _sample;
+
+        // Choose component
+        bool specular = sample.x() < m_ks;
+
+        if (!specular) {
+            // Diffuse
+            sample.x() = (sample.x() - m_ks) / (1.0f - m_ks);
+            bRec.wo = Warp::squareToCosineHemisphere(sample);
+            bRec.eta = 1.0f;
+        } else {
+            // Specular
+            sample.x() /= m_ks;
+
+            Vector3f wh =
+                Warp::squareToBeckmann(sample, m_alpha);
+
+            bRec.wo = reflect(bRec.wi, wh);
+
+            if (Frame::cosTheta(bRec.wo) <= 0)
+                return Color3f(0.0f);
+
+            bRec.eta = 1.0f;
+        }
+
+        bRec.measure = ESolidAngle;
+
+        return eval(bRec) *
+            Frame::cosTheta(bRec.wo) /
+            pdf(bRec);
 
         // Note: Once you have implemented the part that computes the scattered
         // direction, the last part of this function should simply return the
@@ -97,6 +166,28 @@ private:
     float m_intIOR, m_extIOR;
     float m_ks;
     Color3f m_kd;
+
+    float smithG1(const Vector3f &v, const Vector3f &wh) const {
+        float cosThetaV = Frame::cosTheta(v);
+        float dotVH = v.dot(wh);
+
+        if (dotVH <= 0.0f || cosThetaV <= 0.0f)
+            return 0.0f;
+
+        float tanThetaV =
+            std::sqrt(1.0f - cosThetaV * cosThetaV) / cosThetaV;
+
+        float b = 1.0f / (m_alpha * tanThetaV);
+
+        if (b < 1.6f)
+            return (3.535f * b + 2.181f * b * b) /
+                (1.0f + 2.276f * b + 2.577f * b * b);
+        else
+            return 1.0f;
+    }
+    static Vector3f reflect(const Vector3f &wi, const Vector3f &n) {
+        return 2.0f * wi.dot(n) * n - wi;
+    }
 };
 
 NORI_REGISTER_CLASS(Microfacet, "microfacet");
