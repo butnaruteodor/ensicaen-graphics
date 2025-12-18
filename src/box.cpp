@@ -53,10 +53,13 @@ public:
     Point3f p = ray(t);
     Normal3f n(0.f, 0.f, 0.f);
     const float eps = 1e-4f;
-    for (int i = 0; i < 3; i++) {
-        if (std::abs(p[i] - m_min[i]) < eps) n[i] = -1;
-        else if (std::abs(p[i] - m_max[i]) < eps) n[i] = 1;
-    }
+    // Disabled: compute per-face normals to get uniform color
+    // for (int i = 0; i < 3; i++) {
+    //     if (std::abs(p[i] - m_min[i]) < eps) n[i] = -1;
+    //     else if (std::abs(p[i] - m_max[i]) < eps) n[i] = 1;
+    // }
+    // Use a constant normal instead (pointing up/out):
+    n = Normal3f(0.f, 1.f, 0.f);
 
     updateRayAndHit(ray, its, t, n);
     return true;
