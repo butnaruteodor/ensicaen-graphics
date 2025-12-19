@@ -22,7 +22,7 @@ public:
         float dist  = std::sqrt(dist2);
         lightDir.normalize();
 
-        // cos_theta = n ⋅ w
+        // cos_theta = n x w
         float cosTheta = its.shFrame.n.dot(lightDir);
         if (cosTheta <= 0.0f)
             return Color3f(0.0f); // light below surface
@@ -36,8 +36,8 @@ public:
             return Color3f(0.0f);
 
         // Final radiance:
-        //   Phi / (4pi r_squared) * cos_theta
-        return m_energy * (cosTheta / (4.0f * M_PI * dist2));
+        // Phi / (4pi r_squared) * cos_theta
+        return m_energy * (cosTheta / (4.0f * M_PI * M_PI * dist2));
     }
 
     std::string toString() const {
