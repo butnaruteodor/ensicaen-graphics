@@ -10,14 +10,6 @@
 
 NORI_NAMESPACE_BEGIN
 
-/**
- * \brief Simple Path Tracer (Material Sampling / Brute Force)
- * * Strategy:
- * 1. Shoot a ray.
- * 2. If it hits a light, add emitted radiance.
- * 3. Sample the BSDF to get the next direction.
- * 4. Repeat.
- */
 class PathMatsIntegrator : public Integrator {
 public:
     PathMatsIntegrator(const PropertyList &props) { }
@@ -27,18 +19,14 @@ public:
         Color3f throughput(1.0f);
         Ray3f currentRay = ray;
         int depth = 0;
-        
-        // Use a reasonable max depth to prevent infinite loops
-        const int maxDepth = 100; 
 
-        while (depth < maxDepth) {
+        while (depth < 20) {
             Intersection its;
             // If ray misses everything, we stop
             if (!scene->rayIntersect(currentRay, its))
                 break;
 
-            // ===== 1. Direct Hit: Check if we hit an emitter =====
-            // Since we ONLY sample materials, this is the ONLY way we gather light.
+            // Check if we hit an emitter
             if (its.isEmitter()) {
                 EmitterQueryRecord lRec;
                 lRec.ref = currentRay.o; 
@@ -50,16 +38,15 @@ public:
                 Lo += throughput * its.emitter->eval(lRec);
             }
 
-            // ===== 2. Russian Roulette =====
+            // Russian Roulette
             if (depth >= 3) {
-                float survivalProb = std::min(0.99f, throughput.maxCoeff());
+                float survivalProb = std::min(0.90f, throughput.maxCoeff());
                 if (sampler->next1D() > survivalProb)
                     break;
                 throughput /= survivalProb;
             }
 
-            // ===== 3. Indirect Illumination (BSDF Sampling) =====
-            // We sample the material to decide where to go next.
+            // Indirect Illumination (BSDF Sampling)
             if (!its.bsdf)
                 break;
             

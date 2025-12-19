@@ -1,21 +1,3 @@
-/*
-    This file is part of Nori, a simple educational ray tracer
-
-    Copyright (c) 2015 by Wenzel Jakob
-
-    Nori is free software; you can redistribute it and/or modify
-    it under the terms of the GNU General Public License Version 3
-    as published by the Free Software Foundation.
-
-    Nori is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-    GNU General Public License for more details.
-
-    You should have received a copy of the GNU General Public License
-    along with this program. If not, see <http://www.gnu.org/licenses/>.
-*/
-
 #include <nori/bsdf.h>
 #include <nori/frame.h>
 
@@ -26,58 +8,81 @@ public:
     Dielectric(const PropertyList &propList) {
         m_intIOR = propList.getFloat("intIOR", 1.5046f);
         m_extIOR = propList.getFloat("extIOR", 1.000277f);
+
+        m_color = propList.getColor("color", Color3f(1.0f));
     }
 
     Color3f eval(const BSDFQueryRecord &) const override {
-        return Color3f(0.0f); // discrete BRDF
+        return Color3f(0.0f); // Delta distribution
     }
 
     float pdf(const BSDFQueryRecord &) const override {
-        return 0.0f; // discrete BRDF
+        return 0.0f; // Delta distribution
     }
 
     Color3f sample(BSDFQueryRecord &bRec, const Point2f &sample) const override {
-        // Determine entering/exiting
-        bool entering = bRec.wi.z() > 0;
+        bRec.measure = EDiscrete;
+
+        // 1. Check direction (Inside vs Outside)
+        // Nori's local frame always has Normal = (0,0,1)
+        float cosThetaI = Frame::cosTheta(bRec.wi);
+        bool entering = cosThetaI > 0.0f;
+
         float etaI = entering ? m_extIOR : m_intIOR;
         float etaT = entering ? m_intIOR : m_extIOR;
+        
+        // 2. Compute Fresnel Term
+        // Using "etaI / etaT" simplifies the math significantly
         float eta = etaI / etaT;
+        float sinThetaI2 = std::max(0.0f, 1.0f - cosThetaI * cosThetaI);
+        float sinThetaT2 = eta * eta * sinThetaI2;
 
-        // Normal pointing against incoming ray
-        Vector3f n = entering ? Vector3f(0,0,1) : Vector3f(0,0,-1);
+        float Fr = 1.0f; // Default to Total Internal Reflection
+        float cosThetaT = 0.0f;
 
-        float cosThetaI = bRec.wi.dot(n);
-        float sinThetaTSq = eta*eta * (1 - cosThetaI*cosThetaI);
-
-        bRec.measure = EDiscrete;
-        bRec.eta = eta;
-
-        // Total internal reflection
-        if (sinThetaTSq > 1.0f) {
-            // Reflect across normal
-            bRec.wo = bRec.wi - 2.f * bRec.wi.dot(n) * n;
-            return Color3f(1.0f);
+        // IMPROVEMENT 2: Numerical Stability check
+        // If sinThetaT2 > 1.0, we have Total Internal Reflection (TIR).
+        if (sinThetaT2 < 1.0f) {
+            cosThetaT = std::sqrt(std::max(0.0f, 1.0f - sinThetaT2));
+            
+            // Exact Dielectric Fresnel Equations
+            // We use absolute cosines to ensure correct math regardless of direction
+            float absCosI = std::abs(cosThetaI);
+            
+            float Rs = (etaI * absCosI - etaT * cosThetaT) / (etaI * absCosI + etaT * cosThetaT);
+            float Rp = (etaT * absCosI - etaI * cosThetaT) / (etaT * absCosI + etaI * cosThetaT);
+            Fr = 0.5f * (Rs * Rs + Rp * Rp);
         }
 
-        float cosThetaT = std::sqrt(1 - sinThetaTSq);
+        // 3. Russian Roulette: Choose Reflection or Refraction based on Fr
+        if (sample.x() < Fr) {
+            // --- REFLECTION ---
+            // In local coordinates, reflection is just (-x, -y, z)
+            bRec.wo = Vector3f(-bRec.wi.x(), -bRec.wi.y(), bRec.wi.z());
+            bRec.eta = 1.0f; // No index change on reflection
 
-        // Fresnel (Schlick)
-        float R0 = (etaI - etaT) / (etaI + etaT);
-        R0 *= R0;
-        float R = R0 + (1 - R0) * std::pow(1 - cosThetaI, 5);
-
-        if (sample.x() < R) {
-            // Reflection
-            bRec.wo = bRec.wi - 2.f * bRec.wi.dot(n) * n;
-            return Color3f(R);
+            // Return Color * Weight. 
+            // Weight = Fr / PDF. Since PDF = Fr, they cancel out -> 1.0
+            return m_color; 
         } else {
-            // Refraction
-            bRec.wo = -eta * bRec.wi + (eta * cosThetaI - cosThetaT) * n;
-            return Color3f(1.0f - R);
+            // --- REFRACTION ---
+            bRec.eta = eta; // Record relative IOR for the integrator
+
+            // Robust vector math for refraction in local frame
+            // The sign of Z depends on whether we are entering or exiting
+            float signZ = entering ? -1.0f : 1.0f;
+            
+            bRec.wo = Vector3f(
+                -eta * bRec.wi.x(),
+                -eta * bRec.wi.y(),
+                signZ * cosThetaT
+            );
+
+            // CRITICAL: Radiance compression factor (eta^2)
+            // Light concentrates when entering denser inputs.
+            return m_color * (eta * eta);
         }
     }
-
-
 
     std::string toString() const override {
         return tfm::format(
@@ -90,6 +95,7 @@ public:
 
 private:
     float m_intIOR, m_extIOR;
+    Color3f m_color;
 };
 
 NORI_REGISTER_CLASS(Dielectric, "dielectric");

@@ -10,16 +10,6 @@
 
 NORI_NAMESPACE_BEGIN
 
-/**
- * \brief Path Tracer with Explicit Light Sampling (EMS / Next Event Estimation)
- * 
- * Strategy:
- * 1. Shoot a ray.
- * 2. If it hits a light, add emitted radiance (only from BSDF samples).
- * 3. Explicitly sample lights for direct illumination (shadow rays).
- * 4. Sample the BSDF to get the next direction (indirect).
- * 5. Repeat.
- */
 class PathEMSIntegrator : public Integrator {
 public:
     PathEMSIntegrator(const PropertyList &props) { }
@@ -28,47 +18,39 @@ public:
         Color3f Lo(0.0f);
         Color3f throughput(1.0f);
         Ray3f currentRay = ray;
+        
         int depth = 0;
-        const int maxDepth = 100;
+        bool includeEmitted = true; // "lastBounceSpecular" logic for EMS
 
-        while (depth < maxDepth) {
+        // Pre-collect emitters
+        std::vector<const Emitter *> emitters;
+        for (uint32_t i = 0; i < scene->getAccel()->getMeshCount(); ++i) {
+            const Mesh *mesh = scene->getAccel()->getMesh(i);
+            if (mesh->isEmitter()) {
+                emitters.push_back(mesh->getEmitter());
+            }
+        }
+        
+        while (depth < 20) {
             Intersection its;
             if (!scene->rayIntersect(currentRay, its))
                 break;
 
-            // ===== 1. Direct Hit on Emitter (BSDF path only) =====
-            if (its.isEmitter()) {
+            // Check if we hit an emitter
+            if (its.isEmitter() && includeEmitted) {
                 EmitterQueryRecord lRec;
                 lRec.ref = currentRay.o;
                 lRec.p = its.p;
                 lRec.n = its.shFrame.n;
                 lRec.wi = -currentRay.d;
                 
-                Color3f Le = its.emitter->eval(lRec);
-                Lo += throughput * Le;
+                Lo += throughput * its.emitter->eval(lRec);
             }
 
-            // ===== 2. Russian Roulette =====
-            if (depth >= 3) {
-                float survivalProb = std::min(0.99f, throughput.maxCoeff());
-                if (sampler->next1D() > survivalProb)
-                    break;
-                throughput /= survivalProb;
-            }
-
-            // ===== 3. Explicit Light Sampling (Emitter Sampling / Next Event Estimation) =====
-            std::vector<const Emitter *> emitters;
-            for (uint32_t i = 0; i < scene->getAccel()->getMeshCount(); ++i) {
-                const Mesh *mesh = scene->getAccel()->getMesh(i);
-                if (mesh->isEmitter()) {
-                    emitters.push_back(mesh->getEmitter());
-                }
-            }
-            
+            // Next event estimation
             if (!emitters.empty() && its.bsdf) {
-                // Uniformly sample one of the emitters
                 size_t lightIdx = std::min(
-                    (size_t)(sampler->next1D() * emitters.size()),
+                    (size_t)(sampler->next1D() * emitters.size()), 
                     emitters.size() - 1
                 );
                 const Emitter *emitter = emitters[lightIdx];
@@ -76,47 +58,52 @@ public:
                 EmitterQueryRecord lRec;
                 lRec.ref = its.p;
                 
-                float lightPdf;
+                float lightPdf; 
                 Color3f Le = emitter->sample(lRec, sampler->next2D(), lightPdf);
                 
                 if (!Le.isZero() && lightPdf > 0.0f) {
-                    Ray3f shadowRay(its.p, lRec.wi, Epsilon, lRec.dist - Epsilon);
-                    if (!scene->rayIntersect(shadowRay)) {
-                        BSDFQueryRecord bRec(
-                            its.toLocal(lRec.wi),
-                            its.toLocal(-currentRay.d),
-                            ESolidAngle
-                        );
-                        Color3f fr = its.bsdf->eval(bRec);
-                        
-                        // Geometry term: cosines at both surfaces divided by distance squared
-                        float cosAtShading = std::abs(its.shFrame.n.dot(lRec.wi));
-                        float cosAtLight = std::abs(lRec.n.dot(-lRec.wi));
-                        float G = (cosAtShading * cosAtLight) / (lRec.dist * lRec.dist);
-                        
-                        // We sampled 1 light uniformly out of N
-                        float weightFactor = (float)emitters.size();
-                        
-                        Color3f directContrib = fr * Le * G * weightFactor / lightPdf;
-                        Lo += throughput * directContrib;
+                    BSDFQueryRecord bRec(
+                        its.toLocal(-currentRay.d), 
+                        its.toLocal(lRec.wi), 
+                        ESolidAngle
+                    );
+                    
+                    Color3f fr = its.bsdf->eval(bRec); 
+
+                    if (!fr.isZero()) {
+                        Ray3f shadowRay(its.p, lRec.wi, Epsilon, lRec.dist - Epsilon);
+                        if (!scene->rayIntersect(shadowRay)) {
+                            float cosAtShading = Frame::cosTheta(bRec.wo); 
+                            float cosAtLight   = std::abs(lRec.n.dot(-lRec.wi));
+                            float distSq       = lRec.dist * lRec.dist;
+                            float G            = cosAtLight / distSq; 
+                            float weightFactor = (float)emitters.size();
+
+                            // EMS Contribution
+                            Lo += throughput * fr * Le * cosAtShading * G * weightFactor / lightPdf;
+                        }
                     }
                 }
             }
 
-            // ===== 4. Indirect Illumination (BSDF Sampling) =====
-            if (!its.bsdf)
-                break;
-            
+            // Russian Roulette
+            if (depth >= 3) {
+                float prob = std::min(0.99f, throughput.maxCoeff());
+                if (sampler->next1D() > prob) break;
+                throughput /= prob;
+            }
+
+            // Indirect Illumination (BSDF Sampling)
+            if (!its.bsdf) break;
+
             BSDFQueryRecord bRec(its.toLocal(-currentRay.d));
             Color3f bsdfSample = its.bsdf->sample(bRec, sampler->next2D());
             
-            if (bsdfSample.isZero())
-                break;
+            if (bsdfSample.isZero()) break;
 
             throughput *= bsdfSample;
-            
-            Vector3f nextDir = its.toWorld(bRec.wo);
-            currentRay = Ray3f(its.p, nextDir, Epsilon, std::numeric_limits<float>::infinity());
+            currentRay = Ray3f(its.p, its.toWorld(bRec.wo), Epsilon, INFINITY);
+            includeEmitted = (bRec.measure == EDiscrete);
             
             depth++;
         }
@@ -124,9 +111,7 @@ public:
         return Lo;
     }
 
-    std::string toString() const override {
-        return "PathEMSIntegrator[]";
-    }
+    std::string toString() const override { return "PathEMSIntegrator[]"; }
 };
 
 NORI_REGISTER_CLASS(PathEMSIntegrator, "path_ems");
